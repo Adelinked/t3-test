@@ -8,18 +8,40 @@ import type { RouterOutputs } from "~/utils/api";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import Image from "next/image";
-import { LoadingPage } from "~/components/loading";
+import { LoadingPage, LoadingSpinner } from "~/components/loading";
+import { useState } from "react";
+import toast from "react-hot-toast";
+
 dayjs.extend(relativeTime);
+
 const CreatePostWizard = () => {
   const { user } = useUser();
-  if (!user) return null;
+  const [input, setInput] = useState("");
+  const { mutate, isLoading: isPosting } = api.posts.create.useMutation({
+    onSuccess: () => {
+      setInput(""), void ctx.posts.getAll.invalidate();
+    },
+    onError: (e) => {
+      const errorMessage = e.data?.zodError?.fieldErrors.content;
 
-  console.log(user);
+      if (errorMessage && errorMessage[0]) {
+        toast.error(errorMessage[0]);
+      } else {
+        toast.error("Failed to post please try again later!");
+      }
+    },
+  });
+
+  const ctx = api.useContext();
+
+  if (!user || !user.username) return null;
+
+  //console.log(user);
   return (
-    <div className="flex w-full gap-3 ">
+    <div className="flex w-full  items-center gap-3 ">
       <Image
         src={user.profileImageUrl}
-        alt={`${user?.username}'s profile picture`}
+        alt={`${user.username}'s profile picture`}
         className="h-14 w-14 rounded-full"
         width={56}
         height={56}
@@ -27,7 +49,28 @@ const CreatePostWizard = () => {
       <input
         className="grow bg-transparent outline-none"
         placeholder="type some emojis!"
+        type="text"
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        disabled={isPosting}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            if (input !== "") {
+              mutate({ content: input });
+            }
+          }
+        }}
       />
+      {input.length > 0 ? (
+        <button
+          onClick={() => mutate({ content: input })}
+          className="flex h-12 w-16 items-center justify-center rounded bg-slate-700 "
+          disabled={isPosting}
+        >
+          {!isPosting ? "Post" : <LoadingSpinner />}
+        </button>
+      ) : null}
     </div>
   );
 };
@@ -50,7 +93,7 @@ const PostView = (props: PostWithUser) => {
           <span className="text-slate-300">{`@${author?.username}`}</span>
         </div>
         <div>
-          <span>{post.content}</span>{" "}
+          <span className="text-2xl">{post.content}</span>{" "}
           <span className="font-thin">{`· ${dayjs(
             post.createdAt
           ).fromNow()}`}</span>
@@ -66,7 +109,7 @@ const Feed = () => {
   if (!data) <div>Something went wrong</div>;
   return (
     <div className="flex flex-col">
-      {[...data, ...data]?.map((fullPost) => (
+      {data?.map((fullPost) => (
         <PostView {...fullPost} key={fullPost.post.id} />
       ))}
     </div>
