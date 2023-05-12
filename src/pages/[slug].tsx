@@ -9,12 +9,29 @@ import { appRouter } from "~/server/api/root";
 import superjson from "superjson";
 import { PageLayout } from "~/components/layout";
 import Image from "next/image";
+import { LoadingPage } from "~/components/loading";
+import { PostView } from "~/components/postView";
 type PageProps = InferGetStaticPropsType<typeof getStaticProps>;
+
+const ProfileFeed = (props: { userId: string }) => {
+  const { data, isLoading } = api.posts.getPostByUserId.useQuery({
+    userId: props.userId,
+  });
+  if (isLoading) return <LoadingPage />;
+  if (!data || data.length == 0) return <div>User has not posted yet</div>;
+  return (
+    <div className="flex flex-col">
+      {data?.map((fullPost) => (
+        <PostView key={fullPost.post.id} {...fullPost} />
+      ))}{" "}
+    </div>
+  );
+};
+
 const ProfilePage: NextPage<PageProps> = ({ username }) => {
   const { data, isLoading } = api.profile.getUserByUserName.useQuery({
     username: username,
   });
-  console.log(username);
   if (isLoading) console.log("...is loading");
   if (!data || !data.username) return <div>404</div>;
   return (
@@ -35,6 +52,7 @@ const ProfilePage: NextPage<PageProps> = ({ username }) => {
         <div className="h-16" />
         <div className="p-4 text-2xl font-bold">{`@${data.username}`}</div>
         <div className="border-b border-slate-400" />
+        <ProfileFeed userId={data.id} />
       </PageLayout>
     </>
   );
